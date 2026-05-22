@@ -1,0 +1,55 @@
+
+# ============================================
+# AI 聊天平台 - 开发环境配置
+# ============================================
+#
+# 作用：开发环境专用的配置。
+#       开发环境的特点：
+#         1. 使用本地数据库，方便调试
+#         2. 打印 SQL 日志，方便查看 MyBatis 生成的 SQL
+#         3. 端口使用 8080，不与生产环境冲突
+#         4. API Key 可以直接写（仅限本地开发）
+#
+# 激活方式：spring.profiles.active=dev
+#           （已在 application.yml 中设为默认，直接运行即可）
+# ============================================
+
+# 服务器配置
+server:
+  port: 8080
+
+# Spring 配置
+spring:
+
+  # 数据源配置（连接本地 MySQL 数据库）
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+# MyBatis Plus 配置（开发环境特有）
+mybatis-plus:
+  configuration:
+    # 控制台打印 SQL 日志（开发时方便调试）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# JWT 配置
+jwt:
+  # 签名密钥（开发环境可以用简单密钥）
+  secret: ai-chat-secret-key-2024-this-is-a-very-long-secret-key-for-jwt
+  # 令牌过期时间：7天（单位：毫秒）
+  expiration: 604800000
+
+# DeepSeek API 配置
+deepseek:
+  # DeepSeek API 密钥（从环境变量读取，不再硬编码）
+  # 开发环境配置方式：
+  #   Windows PowerShell:  $env:DEEPSEEK_API_KEY="sk-xxxx"
+  #   IDEA 运行配置:        环境变量 → DEEPSEEK_API_KEY=sk-xxxx
+  #   macOS/Linux:         export DEEPSEEK_API_KEY="sk-xxxx"
+  api-key: ${DEEPSEEK_API_KEY}
+  # DeepSeek API 地址
+  api-url: https://api.deepseek.com/v1/chat/completions
+  # 使用的模型名称
+  model: deepseek-chat

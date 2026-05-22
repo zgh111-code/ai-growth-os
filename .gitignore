@@ -1,0 +1,44 @@
+# ========== Maven 构建产物 ==========
+target/
+*.jar
+*.war
+*.ear
+
+# ========== IDE 配置目录 ==========
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========== OS 系统文件 ==========
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+*.lnk
+
+# ========== 日志文件 ==========
+logs/
+*.log
+*.log.gz
+
+# ========== 环境/敏感配置 ==========
+*.local.yml
+application-local.yml
+.env.local
+.env.*.local
+*.cnf                              # MySQL 凭证文件（含密码）
+deploy/mysql-backup.cnf            # 备份凭证模板（部署时填真实密码）
+
+# ========== 临时文件 ==========
+*.tmp
+*.bak
+*.orig
+*.class
+
+# ========== 依赖目录 ==========
+node_modules/

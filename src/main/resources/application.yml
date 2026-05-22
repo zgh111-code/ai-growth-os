@@ -1,0 +1,44 @@
+# ============================================
+# AI 聊天平台 - 主配置文件（总入口）
+# ============================================
+#
+# 作用：作为所有配置文件的统一入口，只放置"公共配置"。
+#       公共配置指开发环境和生产环境都相同的配置。
+#
+# 环境切换方式：
+#   开发环境：java -jar ai-chat.jar --spring.profiles.active=dev
+#   生产环境：java -jar ai-chat.jar --spring.profiles.active=prod
+#
+# 默认激活 dev 环境（方便本地开发直接运行）
+# ============================================
+
+# 默认激活 dev 环境
+spring:
+  profiles:
+    active: dev
+
+  application:
+    name: ai-chat
+
+# ============================================
+# 以下配置是"公共配置"，所有环境共享
+# ============================================
+
+# MyBatis Plus 全局配置
+mybatis-plus:
+  # 实体类所在的包路径（MyBatis Plus 会自动扫描别名）
+  type-aliases-package: com.al.aichat.entity
+  # Mapper XML 文件位置（如果使用 XML 方式写 SQL）
+  mapper-locations: classpath:mapper/*.xml
+  # 全局配置
+  global-config:
+    db-config:
+      # 主键生成策略：自增
+      id-type: auto
+      # 逻辑删除字段名
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    # 开启驼峰命名映射（数据库 user_name -> Java userName）
+    map-underscore-to-camel-case: true
