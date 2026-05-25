@@ -1,66 +1,283 @@
+@import "tailwindcss";
+
 /* ============================================================
-   AI 聊天平台 — 全局样式
-   设计方向：Warm Paper — 温暖、克制、自然
+   AI Growth OS — 校园学习空间 Design System v5
+   设计方向：清晨图书馆 × 蓝白校园 × 温柔科技感
+   关键词：library morning / soft blue / paper texture / glow
    ============================================================ */
 
-:root {
-  --bg: #faf9f6;
-  --bg-warm: #f5f2ed;
-  --surface: #ffffff;
-  --border: #e8e4dd;
-  --border-light: #f0ece6;
+@theme {
+  --color-blue-50: #F0F5FF;
+  --color-blue-100: #E0ECFF;
+  --color-blue-200: #BDD3FF;
+  --color-blue-400: #7CB8FF;
+  --color-blue-500: #4F8CFF;
+  --color-blue-600: #3B6FDF;
+  --color-blue-700: #2D52B5;
+  --color-sky-300: #B8E4FF;
+  --color-sky-400: #7CCBFF;
+  --color-sky-500: #4DB8F0;
+  --color-mint-400: #6DD5C0;
+  --color-mint-500: #3EC4A0;
+  --color-amber-400: #FBBF24;
+  --color-amber-500: #F59E0B;
+  --color-coral-400: #FF8A7A;
+  --color-coral-500: #FF6B5B;
 
-  --text: #3c3a37;
-  --text-secondary: #787570;
-  --text-muted: #a09c95;
+  --color-bg: #F5F8FC;
+  --color-bg-warm: #F8FAFD;
+  --color-surface: #FFFFFF;
+  --color-sidebar: #F4F7FC;
+  --color-text: #1C2640;
+  --color-text-secondary: #5B6780;
+  --color-text-muted: #909BB5;
+  --color-border: #E4EAF4;
+  --color-border-light: #F0F4FA;
 
-  --accent: #4a6a8a;
-  --accent-hover: #3d5a75;
-  --accent-bg: rgba(74, 106, 138, 0.06);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
-  --sidebar-bg: #2a2a2f;
-  --sidebar-text: #b0adb5;
-  --sidebar-active: #35343a;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 16px;
-
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
-
-  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-xs: 0 1px 2px rgba(79,140,255,0.03);
+  --shadow-sm: 0 2px 8px rgba(79,140,255,0.05);
+  --shadow-md: 0 4px 18px rgba(79,140,255,0.07);
+  --shadow-lg: 0 8px 32px rgba(79,140,255,0.10);
 }
 
 * { box-sizing: border-box; }
 
+/* ============================================================
+   Body — 沉浸式蓝白学习空间
+   多层背景：渐变 + 纸质纹理 + 氛围光晕
+   ============================================================ */
 body {
   margin: 0;
-  font-family: var(--font);
+  font-family: var(--font-sans);
   font-size: 15px;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--color-text);
+  /* 多层背景：渐变 + 纸质纹理 */
+  background:
+    /* 顶层：notebook 圆点纹理 */
+    radial-gradient(circle, rgba(79,140,255,0.06) 0.9px, transparent 0.9px),
+    /* 底层：蓝白青渐变 */
+    linear-gradient(
+      165deg,
+      #E4F0FD 0%,
+      #EEF4FC 20%,
+      #F5F8FC 40%,
+      #F3F7FC 60%,
+      #ECF3FB 80%,
+      #E6F0FA 100%
+    );
+  background-size: 20px 20px, 100% 100%;
+  background-attachment: fixed;
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar { width: 5px; }
+/* ============================================================
+   Scrollbar
+   ============================================================ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d5d0c8; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #C4D6F5; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #A8C0E8; }
 
 ::selection {
-  background: rgba(91,91,214,0.12);
-  color: var(--accent);
+  background: rgba(79, 140, 255, 0.12);
+  color: #2D52B5;
 }
 
-/* Element Plus 微调 */
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes softGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.8; transform: scale(1.05); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25%      { transform: translateY(-8px) translateX(4px); }
+  50%      { transform: translateY(-4px) translateX(-2px); }
+  75%      { transform: translateY(-12px) translateX(6px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes liftIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes drift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.anim-up { animation: fadeUp 0.5s ease-out both; }
+.anim-in { animation: fadeIn 0.4s ease-out both; }
+.anim-float { animation: float 3s ease-in-out infinite; }
+.anim-lift { animation: liftIn 0.45s ease-out both; }
+
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.stagger > *:nth-child(4) { animation-delay: 0.22s; }
+.stagger > *:nth-child(5) { animation-delay: 0.28s; }
+
+/* ============================================================
+   背景纹理工具类
+   ============================================================ */
+
+/* 圆点笔记本纹理 */
+.dot-bg {
+  background-image: radial-gradient(circle, rgba(79,140,255,0.04) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+/* 网格笔记本纹理 */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(79,140,255,0.03) 0.5px, transparent 0.5px),
+    linear-gradient(90deg, rgba(79,140,255,0.03) 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
+}
+
+/* ============================================================
+   玻璃拟态卡片
+   ============================================================ */
+
+/* 轻玻璃 — 日常卡片使用 */
+.glass-card {
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(79,140,255,0.10);
+}
+
+/* 实玻璃 — 需要更白时使用 */
+.glass-card-solid {
+  background: rgba(255,255,255,0.62);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(79,140,255,0.12);
+}
+
+/* ============================================================
+   全局卡片软白样式 — 替代纯白 #fff
+   ============================================================ */
+.card-soft {
+  background: rgba(255,255,255,0.68);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(79,140,255,0.06);
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(79,140,255,0.03);
+}
+
+/* ============================================================
+   氛围光晕 — 用于页面背景装饰
+   ============================================================ */
+.ambient-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: 0;
+}
+.ambient-orb-top {
+  width: 500px; height: 500px;
+  background: rgba(79,140,255,0.10);
+  top: -200px; right: -150px;
+  animation: float 12s ease-in-out infinite;
+}
+.ambient-orb-bottom {
+  width: 400px; height: 400px;
+  background: rgba(124,203,255,0.08);
+  bottom: -150px; left: -100px;
+  animation: float 14s ease-in-out infinite reverse;
+}
+.ambient-orb-center {
+  width: 350px; height: 350px;
+  background: rgba(62,196,160,0.05);
+  top: 40%; left: 50%;
+  animation: float 10s ease-in-out infinite 3s;
+}
+
+/* ============================================================
+   渐变文字
+   ============================================================ */
+.grad-text {
+  background: linear-gradient(135deg, #4F8CFF 0%, #7CCBFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   Element Plus overrides
+   ============================================================ */
 .el-button--primary {
-  --el-button-bg-color: var(--accent);
-  --el-button-border-color: var(--accent);
-  --el-button-hover-bg-color: var(--accent-hover);
-  --el-button-hover-border-color: var(--accent-hover);
-  font-weight: 550;
+  --el-button-bg-color: #4F8CFF;
+  --el-button-border-color: #4F8CFF;
+  --el-button-hover-bg-color: #3B6FDF;
+  --el-button-hover-border-color: #3B6FDF;
+  --el-button-active-bg-color: #2D52B5;
+  font-weight: 580;
+}
+.el-button {
+  --el-border-radius-base: 12px;
+  transition: all 0.22s ease;
+}
+.el-input__wrapper, .el-textarea__inner {
+  border-radius: 14px !important;
+}
+.el-dialog {
+  --el-dialog-border-radius: 22px;
+  --el-dialog-box-shadow: var(--shadow-lg);
+}
+.el-message {
+  --el-message-border-radius: 14px;
+  border-radius: 14px !important;
+}
+.el-switch {
+  --el-switch-on-color: #4F8CFF;
 }
 
-.el-message { border-radius: var(--radius) !important; }
-.el-dialog { border-radius: var(--radius-lg) !important; }
+/* ============================================================
+   Legacy CSS variables (compat)
+   ============================================================ */
+:root {
+  --bg: #F5F8FC;
+  --bg-warm: #F8FAFD;
+  --surface: rgba(255,255,255,0.68);
+  --border: #E4EAF4;
+  --border-light: #F0F4FA;
+  --text: #1C2640;
+  --text-secondary: #5B6780;
+  --text-muted: #909BB5;
+  --accent: #4F8CFF;
+  --accent-hover: #3B6FDF;
+  --accent-bg: rgba(79,140,255,0.08);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 22px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace;
+  --sidebar-bg: #F4F7FC;
+  --sidebar-text: #5B6780;
+  --sidebar-active: #E0ECFF;
+}

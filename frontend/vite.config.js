@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -15,7 +16,7 @@ export default defineConfig(({ mode }) => {
   const isProd = mode === 'production'
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), tailwindcss()],
 
     // 构建配置
     build: {
@@ -57,7 +58,14 @@ export default defineConfig(({ mode }) => {
       // 开发服务器端口
       port: 5173,
       // 启动后自动打开浏览器
-      open: true
+      open: true,
+      // API 代理：将 /api 请求转发到后端 8080
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true
+        }
+      }
     }
   }
 })

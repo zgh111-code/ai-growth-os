@@ -1,5 +1,8 @@
 <template>
   <div class="app-layout" :class="{ 'has-sidenav': showNav }">
+    <!-- 全局氛围光晕 -->
+    <div class="ambient-orb ambient-orb-top" aria-hidden="true"></div>
+    <div class="ambient-orb ambient-orb-bottom" aria-hidden="true"></div>
     <SideNav v-if="showNav" />
     <main :class="showNav ? 'main-with-nav' : 'main-full'">
       <router-view />
@@ -58,12 +61,10 @@ const showNav = computed(() => {
 
 html, body {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f5f5f7;
-  color: #1d1d1f;
+  color: #1C2640;
 }
 
 #app { height: 100%; }
@@ -72,14 +73,14 @@ html, body {
 
 .main-full {
   flex: 1;
-  min-height: 100%;
+  min-height: 100vh;
 }
 
 .main-with-nav {
   flex: 1;
-  margin-left: 220px;
-  min-height: 100%;
-  padding-bottom: 70px; /* room for mobile bottom nav */
+  margin-left: 210px;
+  min-height: 100vh;
+  padding-bottom: 70px;
 }
 
 @media (max-width: 768px) {
@@ -96,10 +97,10 @@ html, body {
     bottom: 0; left: 0; right: 0;
     display: flex;
     justify-content: space-around;
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid #e5e5ea;
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid #E4EAF4;
     padding: 6px 0 env(safe-area-inset-bottom, 6px);
     z-index: 100;
   }
@@ -108,27 +109,22 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
+  gap: 3px;
+  padding: 6px 14px;
   text-decoration: none;
-  border-radius: 8px;
-  transition: all 0.15s;
+  border-radius: 10px;
+  transition: all 0.2s;
 }
 .nav-item.router-link-active .nav-icon,
 .nav-item.router-link-active .nav-label {
-  color: #007aff;
+  color: #5B9BD5;
 }
-.nav-icon { display: flex; color: #86868b; }
-.nav-label { font-size: 10px; font-weight: 500; color: #86868b; }
+.nav-icon { display: flex; color: #B5B1AC; transition: color 0.2s; }
+.nav-label { font-size: 10px; font-weight: 550; color: #B5B1AC; transition: color 0.2s; }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #b0b5bd; }
-::selection { background: rgba(64, 158, 255, 0.2); color: #1d1d1f; }
-
-.el-button { --el-border-radius-base: 8px; }
-.el-input__wrapper, .el-textarea__inner { border-radius: 10px !important; }
-.el-dialog { --el-dialog-border-radius: 14px; }
-.el-message { --el-message-border-radius: 10px; border-radius: 10px !important; }
+::-webkit-scrollbar-thumb { background: #C4D6F5; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #A8C0E8; }
+::selection { background: rgba(79,140,255,0.12); color: #2D52B5; }
 </style>
