@@ -202,8 +202,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   sendMessage, createSession, getSessionList, deleteSession, cleanSessions,
@@ -214,6 +214,7 @@ import MarkdownRenderer from '../components/MarkdownRenderer.vue'
 import UserProfile from '../components/UserProfile.vue'
 
 const router = useRouter()
+const route = useRoute()
 const messageAreaRef = ref(null)
 const inputEl = ref(null)
 const inputText = ref('')
@@ -277,12 +278,43 @@ onMounted(async () => {
   await loadSessions()
 })
 
+// 从历史页跳转：加载指定会话（即使不在侧栏列表中也能加载）
+const resumeChatSession = async (sessionId) => {
+  try {
+    const res = await getSessionHistory(sessionId)
+    if (res.data?.messages?.length > 0) {
+      // 会话有消息，创建虚拟会话对象并切换
+      const virtualSession = {
+        id: Number(sessionId),
+        title: res.data.title || '对话记录'
+      }
+      currentSessionId.value = virtualSession.id
+      currentSession.value = virtualSession
+      messages.length = 0
+      messages.push(...res.data.messages)
+      await nextTick()
+      // 加入侧栏列表（如果不存在）
+      if (!sessions.find(s => s.id == sessionId)) {
+        sessions.unshift(virtualSession)
+      }
+      router.replace({ path: '/chat', query: {} })
+    }
+  } catch (e) { console.error('恢复会话失败:', e) }
+}
+
+// 监听历史页跳转参数
+watch(() => route.query.resumeId, (newId) => {
+  if (newId) resumeChatSession(newId)
+}, { immediate: true })
+
 const loadSessions = async () => {
   try {
     const res = await getSessionList()
     sessions.length = 0
     sessions.push(...res.data)
-    if (sessions.length > 0 && !currentSessionId.value) switchSession(sessions[0])
+    if (sessions.length > 0 && !currentSessionId.value && !route.query.resumeId) {
+      switchSession(sessions[0])
+    }
   } catch (e) { console.error('加载会话列表失败:', e) }
 }
 const handleNewSession = async () => {
@@ -391,9 +423,14 @@ const handleSend = async () => {
 }
 const handleCleanSessions = async () => {
   try {
-    await ElMessageBox.confirm('将删除所有标题为"新对话"且没有聊天记录的空会话，确定继续吗？', '清理空会话', { confirmButtonText: '确定清理', cancelButtonText: '取消', type: 'warning' })
+    await ElMessageBox.confirm('将删除所有对话记录，此操作不可恢复，确定继续吗？', '清理全部会话', { confirmButtonText: '确定清理', cancelButtonText: '取消', type: 'warning' })
     const res = await cleanSessions()
-    ElMessage.success(res.msg || '清理完成')
+    const count = res.data ?? 0
+    if (count > 0) {
+      ElMessage.success(`已清理 ${count} 个会话`)
+    } else {
+      ElMessage.info('没有会话需要清理')
+    }
     await loadSessions()
   } catch { /* cancel or error */ }
 }

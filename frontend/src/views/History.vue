@@ -8,6 +8,7 @@
       </button>
       <h1 class="hist-title">聊天历史</h1>
       <div class="hist-actions">
+        <button class="hist-clean" @click="handleCleanAll">清理全部</button>
         <span class="hist-user">{{ user?.nickname || user?.username }}</span>
         <button class="hist-logout" @click="handleLogout">退出</button>
       </div>
@@ -55,6 +56,10 @@
     <div v-else class="hist-body">
       <div class="total-info">共 {{ total }} 条消息，{{ sessions.length }} 个对话</div>
       <div v-for="session in sessions" :key="session.sessionId" class="sess-card" @click="viewSession(session)">
+        <button class="sess-continue" @click.stop="continueChat(session.sessionId)" title="继续对话">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          继续对话
+        </button>
         <div class="sess-head">
           <span class="sess-title">{{ session.title }}</span>
           <span class="sess-count">{{ session.count }} 条</span>
@@ -74,6 +79,7 @@
         <div class="modal-card modal-wide anim-lift">
           <div class="modal-top">
             <h3>对话记录 — {{ currentSessionTitle }}</h3>
+            <button class="sess-continue" @click="continueChat(currentDetailSessionId)" style="margin-right:8px">继续对话</button>
             <button class="modal-close" @click="detailVisible = false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -98,7 +104,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getHistory, getSessionHistory, searchMessages, exportSession } from '../api/index.js'
+import { getHistory, getSessionHistory, searchMessages, exportSession, cleanSessions } from '../api/index.js'
 import MarkdownRenderer from '../components/MarkdownRenderer.vue'
 
 const router = useRouter()
@@ -116,6 +122,7 @@ const searchPages = ref(0)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const currentSessionTitle = ref('')
+const currentDetailSessionId = ref(null)
 const detailMessages = ref([])
 
 const user = computed(() => {
@@ -125,8 +132,7 @@ const user = computed(() => {
 onMounted(async () => {
   const token = localStorage.getItem('token')
   if (!token) { ElMessage.warning('请先登录'); router.push('/login'); return }
-  try { const res = await getHistory(); sessions.value = res.data.sessions; total.value = res.data.total } catch (e) { console.error('获取历史记录失败:', e) }
-  finally { loading.value = false }
+  await loadData()
 })
 
 const handleSearch = async () => {
@@ -144,9 +150,28 @@ const handleExport = async (sessionId, format = 'md') => { try { await exportSes
 const goBack = () => router.push('/chat')
 const goToChat = () => router.push('/chat')
 const viewSession = async (session) => {
-  currentSessionTitle.value = session.title; detailVisible.value = true; detailLoading.value = true
+  currentSessionTitle.value = session.title; currentDetailSessionId.value = session.sessionId
+  detailVisible.value = true; detailLoading.value = true
   try { const res = await getSessionHistory(session.sessionId); detailMessages.value = res.data.messages } catch (e) { ElMessage.error('获取会话详情失败') }
   finally { detailLoading.value = false }
+}
+const continueChat = (sessionId) => {
+  router.push({ path: '/chat', query: { resumeId: sessionId } })
+}
+const loadData = async () => {
+  loading.value = true
+  try { const res = await getHistory(); sessions.value = res.data.sessions; total.value = res.data.total }
+  catch (e) { console.error('获取历史记录失败:', e) }
+  finally { loading.value = false }
+}
+const handleCleanAll = async () => {
+  try {
+    await ElMessageBox.confirm('将删除所有聊天记录，此操作不可恢复，确定继续吗？', '清理全部', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+    const res = await cleanSessions()
+    const count = res.data ?? 0
+    ElMessage.success(`已清理 ${count} 个会话`)
+    await loadData()
+  } catch { /* cancel or error */ }
 }
 const handleLogout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' })
@@ -180,6 +205,13 @@ const formatDetailTime = (dateStr) => {
 .hist-user { font-size: 13px; color: #5B6780; font-weight: 500; }
 .hist-logout { background: none; border: none; cursor: pointer; font-size: 12px; color: #A0ACC5; font-family: inherit; }
 .hist-logout:hover { color: #FF6B5B; }
+.hist-clean {
+  background: none; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer;
+  font-size: 11px; color: #EF4444; font-family: inherit;
+  padding: 4px 12px; border-radius: 6px;
+  transition: all 0.18s;
+}
+.hist-clean:hover { background: #EF4444; color: #fff; }
 
 .hist-search { display: flex; gap: 10px; padding: 16px 24px; max-width: 700px; margin: 0 auto; width: 100%; box-sizing: border-box; align-items: center; }
 .glass-input {
@@ -237,6 +269,18 @@ const formatDetailTime = (dateStr) => {
 .sess-time { font-size: 12px; color: #A0ACC5; }
 .sess-export { background: none; border: none; cursor: pointer; color: #BDD3FF; padding: 4px; border-radius: 6px; }
 .sess-export:hover { color: #4F8CFF; background: rgba(79,140,255,0.06); }
+.sess-continue {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 550; color: #4F8CFF;
+  background: rgba(79,140,255,0.06); border: 1px solid rgba(79,140,255,0.12);
+  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.sess-continue:hover {
+  background: #4F8CFF; color: #fff;
+  box-shadow: 0 2px 10px rgba(79,140,255,0.2);
+}
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.2); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }

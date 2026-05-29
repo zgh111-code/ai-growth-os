@@ -35,13 +35,23 @@ public class DashboardService {
         // 连续打卡天数
         int streak = calcStreak(userId, today);
 
-        // 本周学习天数
+        // 本周每天活动状态
         LambdaQueryWrapper<LearningRecord> weekWrapper = new LambdaQueryWrapper<>();
         weekWrapper.eq(LearningRecord::getUserId, userId)
                    .ge(LearningRecord::getRecordDate, weekStart)
                    .le(LearningRecord::getRecordDate, today);
-        long weekDays = learningRecordMapper.selectList(weekWrapper)
-                .stream().map(LearningRecord::getRecordDate).distinct().count();
+        Set<LocalDate> activeDays = new HashSet<>();
+        for (LearningRecord lr : learningRecordMapper.selectList(weekWrapper)) {
+            activeDays.add(lr.getRecordDate());
+        }
+        int weekDays = activeDays.size();
+
+        // 周一=0 ... 周日=6 的布尔数组
+        List<Boolean> weekActivity = new ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = weekStart.plusDays(i);
+            weekActivity.add(activeDays.contains(d));
+        }
 
         // 复盘记录数
         Long reviewCount = reviewMapper.selectCount(
@@ -51,9 +61,30 @@ public class DashboardService {
         Long expressionCount = expressionMapper.selectCount(
             new LambdaQueryWrapper<ExpressionRecord>().eq(ExpressionRecord::getUserId, userId));
 
+        // 今日所有记录条数
+        int todayCount = 0;
+        todayCount += learningRecordMapper.selectCount(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, userId)
+                .eq(LearningRecord::getRecordDate, today)).intValue();
+        todayCount += reviewMapper.selectCount(
+            new LambdaQueryWrapper<DailyReview>()
+                .eq(DailyReview::getUserId, userId)
+                .ge(DailyReview::getCreatedAt, today.atStartOfDay())).intValue();
+        todayCount += expressionMapper.selectCount(
+            new LambdaQueryWrapper<ExpressionRecord>()
+                .eq(ExpressionRecord::getUserId, userId)
+                .ge(ExpressionRecord::getCreatedAt, today.atStartOfDay())).intValue();
+        todayCount += projectMapper.selectCount(
+            new LambdaQueryWrapper<ProjectRecord>()
+                .eq(ProjectRecord::getUserId, userId)
+                .ge(ProjectRecord::getCreatedAt, today.atStartOfDay())).intValue();
+
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("streak", streak);
-        stats.put("weekDays", (int) weekDays);
+        stats.put("weekDays", weekDays);
+        stats.put("weekActivity", weekActivity);
+        stats.put("todayCount", todayCount);
         stats.put("reviewCount", reviewCount != null ? reviewCount.intValue() : 0);
         stats.put("expressionCount", expressionCount != null ? expressionCount.intValue() : 0);
 

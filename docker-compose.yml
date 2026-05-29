@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai_chat_pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_chat
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "15432:5432"
+    volumes:
+      - E:/develop/docker/pg_data:/var/lib/postgresql/data
+      - ./backend/sql/init_pg.sql:/docker-entrypoint-initdb.d/01_init.sql:ro

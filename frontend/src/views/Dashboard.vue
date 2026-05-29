@@ -24,7 +24,7 @@
           <span class="hw-label">本周学习</span>
         </div>
         <div class="hw-card">
-          <span class="hw-val">{{ recent.length }}</span><span class="hw-unit">条</span>
+          <span class="hw-val">{{ stats.todayCount }}</span><span class="hw-unit">条</span>
           <span class="hw-label">今日记录</span>
         </div>
       </div>
@@ -119,7 +119,7 @@
         <div class="side-card">
           <div class="side-title">本周进度</div>
           <div class="week-dots-row">
-            <span v-for="d in 7" :key="d" class="wd" :class="{ fill: d <= stats.weekDays }">{{ ['一','二','三','四','五','六','日'][d-1] }}</span>
+            <span v-for="(active, i) in stats.weekActivity" :key="i" class="wd" :class="{ fill: active, today: (i + 1) === todayDotIndex }">{{ ['一','二','三','四','五','六','日'][i] }}</span>
           </div>
           <div class="side-stat-row">
             <span>学习天数</span><span class="side-stat-val">{{ stats.weekDays }}/7</span>
@@ -146,12 +146,6 @@
       </div>
     </div>
 
-    <!-- DEBUG: 数据加载状态 -->
-    <div style="position:fixed;bottom:0;left:210px;right:0;z-index:999;background:rgba(0,0,0,0.85);color:#0f0;padding:6px 16px;font-size:11px;font-family:monospace;display:flex;gap:24px">
-      <span>🕐 {{ lastLoad }}</span>
-      <span>{{ loadStatus }}</span>
-      <span>👤 {{ displayName }}</span>
-    </div>
   </div>
 </template>
 
@@ -164,6 +158,7 @@ const route = useRoute()
 const now = new Date()
 const weekdays = ['日','一','二','三','四','五','六']
 const todayStr = `${now.getMonth()+1}月${now.getDate()}日 周${weekdays[now.getDay()]}`
+const todayDotIndex = now.getDay() || 7 // 1=周一 ... 7=周日
 
 const greeting = computed(() => {
   const h = now.getHours()
@@ -187,7 +182,7 @@ const encourageTexts = [
   '小步快跑，持续精进，你已经很棒了',
 ]
 const encourageText = ref(encourageTexts[0])
-const stats = ref({ streak: 0, weekDays: 0, reviewCount: 0, expressionCount: 0 })
+const stats = ref({ streak: 0, weekDays: 0, weekActivity: [false,false,false,false,false,false,false], reviewCount: 0, expressionCount: 0 })
 const recent = ref([])
 const hasReview = computed(() => recent.value.some(r => r.type === 'review'))
 const hasProject = computed(() => recent.value.some(r => r.type === 'project'))
@@ -204,25 +199,12 @@ const focusAction = computed(() => {
   if (stats.value.expressionCount === 0) return '去练习'; return '找 AI 聊聊'
 })
 
-const lastLoad = ref('未加载')
-const loadStatus = ref('')
 async function loadDashboard() {
   try { const s = localStorage.getItem('user'); if (s) userInfo.value = JSON.parse(s) } catch { /* ignore */ }
   try {
     const res = await fetch(`/api/dashboard?_t=${Date.now()}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
-    if (res.ok) {
-      const j = await res.json()
-      if (j.code === 200) {
-        stats.value = j.data.stats; recent.value = j.data.recent || []
-        lastLoad.value = new Date().toLocaleTimeString()
-        loadStatus.value = `✅ streak=${j.data.stats.streak} weekDays=${j.data.stats.weekDays} recent=${j.data.recent?.length || 0}条`
-      } else {
-        loadStatus.value = `❌ code=${j.code} msg=${j.msg}`
-      }
-    } else {
-      loadStatus.value = `❌ HTTP ${res.status}`
-    }
-  } catch (e) { loadStatus.value = '❌ ' + e.message }
+    if (res.ok) { const j = await res.json(); if (j.code === 200) { stats.value = j.data.stats; recent.value = j.data.recent || [] } }
+  } catch (e) { console.error('Dashboard 加载失败:', e) }
 }
 
 onMounted(() => {
@@ -360,6 +342,7 @@ watch(() => route.path, () => loadDashboard(), { immediate: false })
   font-size: 10.5px; color: #A0ACC5; background: #F8FAFD; font-weight: 550;
 }
 .wd.fill { background: #4F8CFF; color: #fff; }
+.wd.today { font-weight: 700; box-shadow: 0 0 8px rgba(79,140,255,0.35); }
 
 /* Stat rows */
 .side-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12.5px; color: #5B6780; }

@@ -11,4 +11,6 @@ public class DeepSeekConfig {
     private String apiKey;
     private String apiUrl;
     private String model;
+    private String embeddingApiUrl;
+    private String embeddingModel;
 }

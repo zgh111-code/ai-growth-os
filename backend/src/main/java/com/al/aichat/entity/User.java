@@ -7,7 +7,7 @@ import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("user")
+@TableName("\"user\"")
 public class User {
 
     @TableId(type = IdType.AUTO)

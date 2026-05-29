@@ -45,6 +45,11 @@ public class SessionService {
     }
 
     public void deleteSession(Long sessionId, Long userId) {
+        // 先删消息再删会话
+        chatMessageMapper.delete(
+            new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getSessionId, sessionId)
+        );
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatSession::getId, sessionId)
                .eq(ChatSession::getUserId, userId);
@@ -69,21 +74,23 @@ public class SessionService {
     }
 
     public int cleanEmptySessions(Long userId) {
+        // 1. 删除该用户所有会话及其消息
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ChatSession::getUserId, userId)
-               .eq(ChatSession::getTitle, "新对话");
-        List<ChatSession> emptySessions = sessionMapper.selectList(wrapper);
+        wrapper.eq(ChatSession::getUserId, userId);
+        List<ChatSession> allSessions = sessionMapper.selectList(wrapper);
         int count = 0;
-        for (ChatSession session : emptySessions) {
-            Long msgCount = chatMessageMapper.selectCount(
+        for (ChatSession session : allSessions) {
+            chatMessageMapper.delete(
                 new LambdaQueryWrapper<ChatMessage>()
                     .eq(ChatMessage::getSessionId, session.getId())
             );
-            if (msgCount == null || msgCount == 0) {
-                sessionMapper.deleteById(session.getId());
-                count++;
-            }
+            sessionMapper.deleteById(session.getId());
+            count++;
         }
+        // 2. 清理孤儿消息（session 已删除但消息未清理的残留数据）
+        LambdaQueryWrapper<ChatMessage> orphanWrapper = new LambdaQueryWrapper<>();
+        orphanWrapper.eq(ChatMessage::getUserId, userId);
+        chatMessageMapper.delete(orphanWrapper);
         return count;
     }
 

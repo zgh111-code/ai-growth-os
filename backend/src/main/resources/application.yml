@@ -28,6 +28,8 @@ spring:
 mybatis-plus:
   # 实体类所在的包路径（MyBatis Plus 会自动扫描别名）
   type-aliases-package: com.al.aichat.entity
+  # 类型处理器所在包
+  type-handlers-package: com.al.aichat.config
   # Mapper XML 文件位置（如果使用 XML 方式写 SQL）
   mapper-locations: classpath:mapper/*.xml
   # 全局配置

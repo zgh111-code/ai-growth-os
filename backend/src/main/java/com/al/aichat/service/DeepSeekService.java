@@ -39,7 +39,7 @@ public class DeepSeekService {
         this.sessionService = sessionService;
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(30_000);
+        factory.setConnectTimeout(10_000);
         factory.setReadTimeout(60_000);
         this.restTemplate = new RestTemplate(factory);
 
@@ -62,6 +62,7 @@ public class DeepSeekService {
         List<Message> messages = new ArrayList<>();
         messages.add(new Message("system", "你是一个智能AI助手，请用中文回答用户的问题。"));
         for (ChatMessage msg : history) {
+            // 仅使用 role 和 content 构建消息，确保不包含 thinking 字段
             messages.add(new Message(msg.getRole(), msg.getContent()));
         }
 
@@ -78,24 +79,8 @@ public class DeepSeekService {
         HttpEntity<ChatRequest> requestEntity = new HttpEntity<>(chatRequest, headers);
 
         log.info("正在调用 DeepSeek API，用户ID: {}, 消息长度: {}", userId, content.length());
-
-        ResponseEntity<ChatResponse> responseEntity;
-        try {
-            responseEntity = restTemplate.postForEntity(
-                    deepSeekConfig.getApiUrl(), requestEntity, ChatResponse.class);
-        } catch (Exception e) {
-            log.error("调用 DeepSeek API 失败: {}", e.getMessage(), e);
-            throw new BusinessException("AI 服务暂时不可用，请稍后重试");
-        }
-
-        ChatResponse chatResponse = responseEntity.getBody();
-        if (chatResponse == null || chatResponse.getChoices() == null || chatResponse.getChoices().isEmpty()) {
-            log.error("DeepSeek API 返回异常，响应体: {}", chatResponse);
-            throw new BusinessException("AI 服务返回异常，请稍后重试");
-        }
-
+        ChatResponse chatResponse = callApiWithRetry(requestEntity);
         String reply = chatResponse.getChoices().get(0).getMessage().getContent();
-
         log.info("DeepSeek API 调用成功，回复长度: {}", reply.length());
 
         ChatMessage assistantMessage = new ChatMessage();
@@ -142,21 +127,7 @@ public class DeepSeekService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(deepSeekConfig.getApiKey());
         HttpEntity<ChatRequest> requestEntity = new HttpEntity<>(chatRequest, headers);
-
-        ResponseEntity<ChatResponse> responseEntity;
-        try {
-            responseEntity = restTemplate.postForEntity(
-                    deepSeekConfig.getApiUrl(), requestEntity, ChatResponse.class);
-        } catch (Exception e) {
-            log.error("RAG 调用 DeepSeek API 失败: {}", e.getMessage());
-            throw new BusinessException("AI 服务暂时不可用，请稍后重试");
-        }
-
-        ChatResponse chatResponse = responseEntity.getBody();
-        if (chatResponse == null || chatResponse.getChoices() == null || chatResponse.getChoices().isEmpty()) {
-            throw new BusinessException("AI 服务返回异常，请稍后重试");
-        }
-
+        ChatResponse chatResponse = callApiWithRetry(requestEntity);
         String reply = chatResponse.getChoices().get(0).getMessage().getContent();
 
         ChatMessage assistantMessage = new ChatMessage();
@@ -189,20 +160,32 @@ public class DeepSeekService {
         headers.setBearerAuth(deepSeekConfig.getApiKey());
         HttpEntity<ChatRequest> requestEntity = new HttpEntity<>(chatRequest, headers);
 
-        ResponseEntity<ChatResponse> responseEntity;
-        try {
-            responseEntity = restTemplate.postForEntity(
-                    deepSeekConfig.getApiUrl(), requestEntity, ChatResponse.class);
-        } catch (Exception e) {
-            log.error("AI 调用失败: {}", e.getMessage());
-            throw new BusinessException("AI 服务暂时不可用，请稍后重试");
-        }
-
-        ChatResponse chatResponse = responseEntity.getBody();
-        if (chatResponse == null || chatResponse.getChoices() == null || chatResponse.getChoices().isEmpty()) {
-            throw new BusinessException("AI 服务返回异常，请稍后重试");
-        }
-
+        ChatResponse chatResponse = callApiWithRetry(requestEntity);
         return chatResponse.getChoices().get(0).getMessage().getContent();
+    }
+
+    private ChatResponse callApiWithRetry(HttpEntity<ChatRequest> requestEntity) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                ResponseEntity<ChatResponse> responseEntity = restTemplate.postForEntity(
+                        deepSeekConfig.getApiUrl(), requestEntity, ChatResponse.class);
+                ChatResponse chatResponse = responseEntity.getBody();
+                if (chatResponse == null || chatResponse.getChoices() == null || chatResponse.getChoices().isEmpty()) {
+                    throw new BusinessException("AI 服务返回异常，请稍后重试");
+                }
+                return chatResponse;
+            } catch (BusinessException e) {
+                throw e; // 业务异常不重试
+            } catch (Exception e) {
+                if (attempt == 0) {
+                    log.warn("AI 调用失败，1秒后重试: {}", e.getMessage());
+                    try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                } else {
+                    log.error("AI 调用重试后仍失败: {}", e.getMessage());
+                    throw new BusinessException("AI 服务暂时不可用，请稍后重试");
+                }
+            }
+        }
+        throw new BusinessException("AI 服务暂时不可用，请稍后重试");
     }
 }

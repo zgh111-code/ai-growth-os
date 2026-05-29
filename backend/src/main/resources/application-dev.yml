@@ -21,12 +21,12 @@ server:
 # Spring 配置
 spring:
 
-  # 数据源配置（连接本地 MySQL 数据库）
+  # 数据源配置（连接本地 PostgreSQL 数据库）
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
+    url: jdbc:postgresql://localhost:15432/ai_chat
+    username: postgres
     password: 123456
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
 
 # MyBatis Plus 配置（开发环境特有）
 mybatis-plus:
@@ -53,3 +53,6 @@ deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
   # 使用的模型名称
   model: deepseek-chat
+  # Embedding API 配置
+  embedding-api-url: https://api.deepseek.com/v1/embeddings
+  embedding-model: deepseek-embedding

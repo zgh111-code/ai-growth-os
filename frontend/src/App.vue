@@ -65,6 +65,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #1C2640;
+  background: linear-gradient(170deg, #F4F7FD 0%, #FAF5FE 50%, #F0F7FF 100%);
 }
 
 #app { height: 100%; }
@@ -78,7 +79,7 @@ html, body {
 
 .main-with-nav {
   flex: 1;
-  margin-left: 210px;
+  margin-left: 190px;
   min-height: 100vh;
   padding-bottom: 70px;
 }

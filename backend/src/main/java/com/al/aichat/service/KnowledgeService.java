@@ -4,6 +4,8 @@ import com.al.aichat.common.BusinessException;
 import com.al.aichat.entity.KnowledgeChunk;
 import com.al.aichat.mapper.KnowledgeChunkMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,15 +18,20 @@ import java.util.stream.Collectors;
 @Service
 public class KnowledgeService {
 
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);
     private final KnowledgeChunkMapper chunkMapper;
-    private static final int CHUNK_SIZE = 500; // 每块最多 500 字符
+    private final EmbeddingService embeddingService;
 
-    public KnowledgeService(KnowledgeChunkMapper chunkMapper) {
+    private static final int CHUNK_SIZE = 500;
+    private static final int OVERLAP = 100;
+
+    public KnowledgeService(KnowledgeChunkMapper chunkMapper, EmbeddingService embeddingService) {
         this.chunkMapper = chunkMapper;
+        this.embeddingService = embeddingService;
     }
 
     /**
-     * 上传并解析文档
+     * 上传并解析文档，生成 embedding 向量
      */
     public List<KnowledgeChunk> upload(Long userId, MultipartFile file) {
         if (file.isEmpty()) throw new BusinessException("文件不能为空");
@@ -35,7 +42,6 @@ public class KnowledgeService {
             throw new BusinessException("仅支持 TXT/MD/代码文件");
         }
 
-        // 读取文件内容
         String content;
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -52,7 +58,7 @@ public class KnowledgeService {
                   .eq(KnowledgeChunk::getFilename, filename);
         chunkMapper.delete(delWrapper);
 
-        // 提取标题（第一行非空行，去掉 # 等标记）
+        // 提取标题
         String title = filename;
         String[] lines = content.split("\n");
         for (String line : lines) {
@@ -60,13 +66,12 @@ public class KnowledgeService {
             if (!trimmed.isEmpty()) { title = trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed; break; }
         }
 
-        // 分块
+        // 分块（带重叠）
         List<KnowledgeChunk> chunks = new ArrayList<>();
         int start = 0;
         int index = 0;
         while (start < content.length()) {
             int end = Math.min(start + CHUNK_SIZE, content.length());
-            // 尽量在换行处断开
             if (end < content.length()) {
                 int nl = content.lastIndexOf('\n', end);
                 if (nl > start + CHUNK_SIZE / 2) end = nl;
@@ -81,9 +86,22 @@ public class KnowledgeService {
                 kc.setChunkIndex(index++);
                 kc.setCharCount(chunk.length());
                 chunkMapper.insert(kc);
+
+                // 生成 embedding（失败不阻塞上传）
+                try {
+                    float[] vector = embeddingService.embed(chunk);
+                    KnowledgeChunk update = new KnowledgeChunk();
+                    update.setId(kc.getId());
+                    update.setEmbedding(vector);
+                    chunkMapper.updateById(update);
+                    kc.setEmbedding(vector);
+                } catch (Exception e) {
+                    log.warn("分块 {} embedding 失败: {}", kc.getChunkIndex(), e.getMessage());
+                }
+
                 chunks.add(kc);
             }
-            start = end + 1;
+            start = end + 1 - OVERLAP;
         }
 
         return chunks;
@@ -96,7 +114,7 @@ public class KnowledgeService {
         LambdaQueryWrapper<KnowledgeChunk> wrapper = new LambdaQueryWrapper<>();
         wrapper.select(KnowledgeChunk::getFilename, KnowledgeChunk::getTitle, KnowledgeChunk::getId)
                .eq(KnowledgeChunk::getUserId, userId)
-               .eq(KnowledgeChunk::getChunkIndex, 0)  // 只取第一条代表文件
+               .eq(KnowledgeChunk::getChunkIndex, 0)
                .orderByDesc(KnowledgeChunk::getCreatedAt);
         return chunkMapper.selectList(wrapper).stream().map(c -> {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -118,38 +136,39 @@ public class KnowledgeService {
     }
 
     /**
-     * 关键词检索 — 支持中英文，自动拆分短语
+     * 混合检索：语义向量 + 关键词加权融合
+     *
+     * 1. 查询 embedding → pgvector 余弦相似度召回 topK*2 候选
+     * 2. 对候选计算关键词匹配分数
+     * 3. 加权融合: finalScore = 0.7 * semanticScore + 0.3 * keywordScore
+     * 4. 取 topK 返回
      */
-    public List<KnowledgeChunk> search(Long userId, String keyword, int topK) {
-        LambdaQueryWrapper<KnowledgeChunk> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(KnowledgeChunk::getUserId, userId);
+    public List<KnowledgeChunk> search(Long userId, String query, int topK) {
+        // Step 1: 语义检索
+        float[] queryVector = embeddingService.embed(query);
+        String vectorStr = vectorToString(queryVector);
+        List<KnowledgeChunk> semanticResults = chunkMapper.searchByEmbedding(userId, vectorStr, topK * 2);
 
-        // 空格分隔的词直接 LIKE
-        String[] words = keyword.trim().split("\\s+");
-        if (words.length >= 2) {
-            for (String word : words) {
-                if (word.length() >= 1) wrapper.like(KnowledgeChunk::getContent, word);
-            }
-        } else {
-            // 单个中文短语：用双字滑动窗口匹配
-            String kw = words[0];
-            wrapper.and(w -> {
-                for (int i = 0; i < kw.length() - 1; i++) {
-                    w.or().like(KnowledgeChunk::getContent, kw.substring(i, Math.min(i + 2, kw.length())));
-                }
-            });
+        if (semanticResults.isEmpty()) {
+            return List.of();
         }
 
-        wrapper.orderByAsc(KnowledgeChunk::getFilename, KnowledgeChunk::getChunkIndex);
-        wrapper.last("LIMIT " + (topK * 3));
+        // Step 2: 混合排序
+        for (KnowledgeChunk chunk : semanticResults) {
+            double keywordScore = computeKeywordScore(chunk.getContent(), query);
+            double semanticScore = chunk.getSimilarity() != null ? chunk.getSimilarity() : 0.0;
+            chunk.setSimilarity(0.7 * semanticScore + 0.3 * keywordScore);
+        }
 
-        List<KnowledgeChunk> results = chunkMapper.selectList(wrapper);
-        results.sort((a, b) -> Integer.compare(
-            countMatches(b.getContent(), keyword),
-            countMatches(a.getContent(), keyword)
-        ));
-        return results.stream().limit(topK).collect(Collectors.toList());
+        // Step 3: 按混合分数排序
+        semanticResults.sort((a, b) -> Double.compare(
+                b.getSimilarity() != null ? b.getSimilarity() : 0.0,
+                a.getSimilarity() != null ? a.getSimilarity() : 0.0));
+
+        return semanticResults.stream().limit(topK).collect(Collectors.toList());
     }
+
+    // ---- 私有工具方法 ----
 
     private int countChunks(Long userId, String filename) {
         LambdaQueryWrapper<KnowledgeChunk> wrapper = new LambdaQueryWrapper<>();
@@ -158,13 +177,43 @@ public class KnowledgeService {
         return Math.toIntExact(chunkMapper.selectCount(wrapper));
     }
 
-    /** 计算双字匹配命中数 */
-    private int countMatches(String text, String keyword) {
-        int count = 0;
-        String lower = text;
-        for (int i = 0; i < keyword.length() - 1; i++) {
-            if (lower.contains(keyword.substring(i, Math.min(i + 2, keyword.length())))) count++;
+    /** float[] → pgvector 字符串格式: [0.1,0.2,...] */
+    private String vectorToString(float[] vec) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vec.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append(vec[i]);
         }
-        return count;
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /** 计算关键词匹配分数（0~1），修复了旧 countMatches 的大小写敏感 bug */
+    private double computeKeywordScore(String text, String query) {
+        if (text == null || query == null || query.isBlank()) return 0.0;
+        String lowerText = text.toLowerCase();
+        String lowerQuery = query.toLowerCase();
+
+        // 完全匹配
+        if (lowerText.contains(lowerQuery)) return 1.0;
+
+        // 空格分隔的词匹配（权重 60%）
+        String[] words = lowerQuery.split("\\s+");
+        int totalWords = words.length;
+        int matchedWords = 0;
+        for (String word : words) {
+            if (word.length() >= 1 && lowerText.contains(word)) matchedWords++;
+        }
+        double wordScore = totalWords > 0 ? (double) matchedWords / totalWords : 0.0;
+
+        // 双字滑动窗口（权重 40%，对中文有效）
+        int totalBigrams = Math.max(1, lowerQuery.length() - 1);
+        int matchedBigrams = 0;
+        for (int i = 0; i < lowerQuery.length() - 1; i++) {
+            if (lowerText.contains(lowerQuery.substring(i, i + 2))) matchedBigrams++;
+        }
+        double bigramScore = (double) matchedBigrams / totalBigrams;
+
+        return 0.6 * wordScore + 0.4 * bigramScore;
     }
 }

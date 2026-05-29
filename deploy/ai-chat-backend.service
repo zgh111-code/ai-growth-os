@@ -1,0 +1,48 @@
+# ============================================================
+# AI 聊天平台 — SpringBoot 后端 Systemd 服务
+# ============================================================
+# 安装方式：
+#   sudo cp deploy/ai-chat-backend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable ai-chat-backend  # 开机自启
+#   sudo systemctl start ai-chat-backend   # 立即启动
+#
+# 常用命令：
+#   sudo systemctl status ai-chat-backend  # 查看状态
+#   sudo systemctl restart ai-chat-backend # 重启
+#   sudo journalctl -u ai-chat-backend -f  # 查看日志
+# ============================================================
+
+[Unit]
+Description=AI Chat Platform - SpringBoot Backend
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=ai-chat
+Group=ai-chat
+WorkingDirectory=/opt/ai-chat/backend
+
+# 环境变量（从 /etc/profile 读取）
+EnvironmentFile=-/etc/ai-chat.env
+
+# 启动命令
+ExecStart=/usr/bin/java -jar /opt/ai-chat/backend/ai-chat-1.0.0.jar \
+    --spring.profiles.active=prod
+
+# 优雅关闭：给 JVM 30 秒清理资源
+ExecStop=/bin/kill -15 $MAINPID
+TimeoutStopSec=30
+
+# 崩溃后自动重启
+Restart=on-failure
+RestartSec=10
+
+# 日志管理
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-chat-backend
+
+[Install]
+WantedBy=multi-user.target

@@ -12,11 +12,11 @@
 # 激活方式：java -jar ai-chat.jar --spring.profiles.active=prod
 #
 # 环境变量说明（部署前必须在服务器上设置）：
-#   MYSQL_HOST      - 数据库主机地址（默认 localhost）
-#   MYSQL_PORT      - 数据库端口（默认 3306）
-#   MYSQL_DATABASE  - 数据库名（默认 ai_chat）
-#   MYSQL_USERNAME  - 数据库用户名
-#   MYSQL_PASSWORD  - 数据库密码
+#   PG_HOST         - 数据库主机地址（默认 localhost）
+#   PG_PORT         - 数据库端口（默认 5432）
+#   PG_DATABASE     - 数据库名（默认 ai_chat）
+#   PG_USERNAME     - 数据库用户名
+#   PG_PASSWORD     - 数据库密码
 #   JWT_SECRET      - JWT 签名密钥（必须设置为复杂随机字符串）
 #   DEEPSEEK_API_KEY - DeepSeek API 密钥
 # ============================================
@@ -30,10 +30,10 @@ spring:
 
   # 数据源配置（生产环境使用环境变量，不硬编码密码）
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:ai_chat}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true
-    username: ${MYSQL_USERNAME}
-    password: ${MYSQL_PASSWORD}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DATABASE:ai_chat}
+    username: ${PG_USERNAME}
+    password: ${PG_PASSWORD}
+    driver-class-name: org.postgresql.Driver
     # HikariCP 连接池配置（生产环境优化）
     hikari:
       # 连接池最大连接数
@@ -66,6 +66,9 @@ deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
   # 使用的模型名称
   model: deepseek-chat
+  # Embedding API 配置
+  embedding-api-url: https://api.deepseek.com/v1/embeddings
+  embedding-model: deepseek-embedding
 
 # ============================================
 # Logback 日志配置（生产环境使用文件日志）

@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@lucide/vue": "^1.17.0",
+    "@vueuse/motion": "^3.0.3",
     "axios": "^1.16.0",
     "element-plus": "^2.14.0",
     "highlight.js": "^11.11.1",

@@ -48,7 +48,7 @@ public class DeepSeekStreamService {
         this.objectMapper = new ObjectMapper();
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(30_000);
+        factory.setConnectTimeout(10_000);
         factory.setReadTimeout(120_000);
         this.restTemplate = new RestTemplate(factory);
     }
@@ -127,14 +127,7 @@ public class DeepSeekStreamService {
 
         log.info("开始流式调用 DeepSeek API，用户ID: {}", userId);
 
-        restTemplate.execute(
-                deepSeekConfig.getApiUrl(),
-                org.springframework.http.HttpMethod.POST,
-                request -> {
-                    request.getHeaders().putAll(headers);
-                    request.getBody().write(finalRequestJson.getBytes(StandardCharsets.UTF_8));
-                },
-                response -> {
+        executeWithRetry(headers, finalRequestJson, response -> {
                     StringBuilder fullReply = new StringBuilder();
 
                     try (BufferedReader reader = new BufferedReader(
@@ -194,5 +187,31 @@ public class DeepSeekStreamService {
                     return null;
                 }
         );
+    }
+
+    private void executeWithRetry(HttpHeaders headers, String body,
+                                   org.springframework.web.client.ResponseExtractor<Void> extractor)
+            throws Exception {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                restTemplate.execute(
+                    deepSeekConfig.getApiUrl(),
+                    org.springframework.http.HttpMethod.POST,
+                    request -> {
+                        request.getHeaders().putAll(headers);
+                        request.getBody().write(body.getBytes(StandardCharsets.UTF_8));
+                    },
+                    extractor
+                );
+                return;
+            } catch (org.springframework.web.client.ResourceAccessException e) {
+                if (attempt == 0) {
+                    log.warn("DeepSeek API 第1次调用失败（{}），1秒后重试...", e.getMessage());
+                    Thread.sleep(1000);
+                } else {
+                    throw e;
+                }
+            }
+        }
     }
 }

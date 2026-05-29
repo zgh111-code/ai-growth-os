@@ -63,13 +63,13 @@ public class SessionController {
     /**
      * POST /api/session/clean
      *
-     * 清理所有空会话（标题为"新对话"且没有聊天记录）
+     * 清理该用户所有会话及聊天记录
      */
     @PostMapping("/clean")
     public Result<Integer> cleanEmptySessions(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         int count = sessionService.cleanEmptySessions(userId);
-        return Result.success("已清理 " + count + " 个空会话", count);
+        return Result.success("已清理 " + count + " 个会话", count);
     }
 
 }
