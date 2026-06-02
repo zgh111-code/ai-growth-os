@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +21,7 @@ public class ExpressionService {
     private final DeepSeekService deepSeekService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final ConcurrentHashMap<LocalDate, String> topicCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Object> topicLocks = new ConcurrentHashMap<>();
 
     private static final String[] FALLBACK_TOPICS = {
         "你如何看待'自律'和'自由'的关系？",
@@ -29,6 +30,30 @@ public class ExpressionService {
         "描述一个你最近做过的决定，并分析你的决策过程。",
         "你理想中的工作是什么样的？为什么？",
         "讲一个你身边的榜样，他的什么品质最打动你？",
+        "如果可以给大一新生一条建议，你会说什么？",
+        "你认为AI会如何改变你的专业领域？",
+        "描述一次你克服困难的经历，你从中学到了什么？",
+        "你如何平衡学习、社交和个人时间？",
+        "谈谈你对'失败是成功之母'的理解",
+        "你认为什么样的人值得深交？",
+        "如果让你给全校同学做一次演讲，你会讲什么主题？",
+        "谈谈你对当前社交媒体的看法",
+        "你认为'天赋'和'努力'哪个更重要？",
+        "描述一个改变你世界观的事件或经历",
+        "你如何看待'内卷'和'躺平'这两种态度？",
+        "如果大学可以重来，你会改变什么？",
+        "谈谈你对'终身学习'的理解",
+        "你认为什么样的师生关系是理想的？",
+        "分享一个你最近关注的时事热点，并谈谈你的看法",
+        "你认为大学期间最应该培养的能力是什么？",
+        "谈谈你对'舒适区'的理解",
+        "如果可以掌握一项新技能，你会选什么？为什么？",
+        "你认为一个人最可贵的品质是什么？",
+        "谈谈你对未来的规划和期待",
+        "分享一本对你影响很大的书，它改变了你什么？",
+        "你如何看待团队合作中的冲突？",
+        "谈谈你对'活在当下'这句话的理解",
+        "你认为什么是真正的朋友？",
     };
 
     public ExpressionService(ExpressionRecordMapper recordMapper, DeepSeekService deepSeekService) {
@@ -36,25 +61,83 @@ public class ExpressionService {
         this.deepSeekService = deepSeekService;
     }
 
-    public String getTodayTopic() {
-        LocalDate today = LocalDate.now();
-        return topicCache.computeIfAbsent(today, d -> generateTopic());
+    public String getTodayTopic(Long userId) {
+        ExpressionRecord todayRecord = getTodayRecord(userId);
+        if (todayRecord != null) {
+            return todayRecord.getTopic();
+        }
+        // 同步避免并发时重复插入
+        Object lock = topicLocks.computeIfAbsent(userId, k -> new Object());
+        synchronized (lock) {
+            todayRecord = getTodayRecord(userId);
+            if (todayRecord != null) {
+                return todayRecord.getTopic();
+            }
+            String topic = generateTopic(userId);
+            ExpressionRecord record = new ExpressionRecord();
+            record.setUserId(userId);
+            record.setTopic(topic);
+            recordMapper.insert(record);
+            return topic;
+        }
     }
 
-    private String generateTopic() {
+    private ExpressionRecord getTodayRecord(Long userId) {
+        LambdaQueryWrapper<ExpressionRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ExpressionRecord::getUserId, userId)
+               .ge(ExpressionRecord::getCreatedAt, LocalDate.now().atStartOfDay())
+               .lt(ExpressionRecord::getCreatedAt, LocalDate.now().plusDays(1).atStartOfDay())
+               .orderByAsc(ExpressionRecord::getCreatedAt)
+               .last("LIMIT 1");
+        return recordMapper.selectOne(wrapper);
+    }
+
+    private String generateTopic(Long userId) {
+        List<String> usedTopics = getUsedTopics(userId);
         try {
             String prompt = "生成一个适合大学生练习逻辑表达的话题，要求：能引发深度思考，适合用3-5分钟口头表达。只返回话题本身，不要解释。";
-            return deepSeekService.generateText("你是表达训练导师，负责生成有深度的表达话题。", prompt).trim();
+            if (!usedTopics.isEmpty()) {
+                prompt += " 注意：绝对不要重复以下已用过的话题——" + String.join("；", usedTopics);
+            }
+            String topic = deepSeekService.generateText("你是表达训练导师，负责生成有深度的表达话题。", prompt).trim();
+            // 如果 AI 仍返回了重复话题，回退到兜底列表
+            if (usedTopics.contains(topic)) {
+                return fallbackTopic(usedTopics);
+            }
+            return topic;
         } catch (Exception e) {
-            return FALLBACK_TOPICS[(int) (System.currentTimeMillis() % FALLBACK_TOPICS.length)];
+            return fallbackTopic(usedTopics);
         }
+    }
+
+    private String fallbackTopic(List<String> usedTopics) {
+        for (String topic : FALLBACK_TOPICS) {
+            if (!usedTopics.contains(topic)) {
+                return topic;
+            }
+        }
+        // 所有话题都用过了，基于日期生成
+        return "今天是你第" + (usedTopics.size() + 1) + "次表达训练，请自由选择一个话题，谈谈你最近的思考与感悟。";
+    }
+
+    private List<String> getUsedTopics(Long userId) {
+        LambdaQueryWrapper<ExpressionRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(ExpressionRecord::getTopic)
+               .eq(ExpressionRecord::getUserId, userId)
+               .isNotNull(ExpressionRecord::getContent);
+        return recordMapper.selectList(wrapper).stream()
+                .map(ExpressionRecord::getTopic)
+                .toList();
     }
 
     public ExpressionRecord submit(Long userId, String content) {
         if (content == null || content.isBlank()) {
             throw new BusinessException("表达内容不能为空");
         }
-        String topic = getTodayTopic();
+        // 确保今天已有占位记录（getTodayTopic 会自动创建）
+        getTodayTopic(userId);
+        ExpressionRecord record = getTodayRecord(userId);
+        record.setContent(content);
 
         String systemPrompt = """
             你是表达能力训练AI。
@@ -88,14 +171,10 @@ public class ExpressionService {
             - 必须具体""";
 
         String aiResponse = deepSeekService.generateText(systemPrompt,
-            "表达主题：" + topic + "\n用户表达内容：" + content);
+            "表达主题：" + record.getTopic() + "\n用户表达内容：" + content);
 
-        ExpressionRecord record = new ExpressionRecord();
-        record.setUserId(userId);
-        record.setTopic(topic);
-        record.setContent(content);
         parseAIResponse(aiResponse, record);
-        recordMapper.insert(record);
+        recordMapper.updateById(record);
         return record;
     }
 
@@ -133,7 +212,28 @@ public class ExpressionService {
     public List<ExpressionRecord> history(Long userId) {
         LambdaQueryWrapper<ExpressionRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ExpressionRecord::getUserId, userId)
+               .isNotNull(ExpressionRecord::getContent)
                .orderByDesc(ExpressionRecord::getCreatedAt);
         return recordMapper.selectList(wrapper);
+    }
+
+    public ExpressionRecord getById(Long id, Long userId) {
+        LambdaQueryWrapper<ExpressionRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ExpressionRecord::getId, id)
+               .eq(ExpressionRecord::getUserId, userId);
+        ExpressionRecord record = recordMapper.selectOne(wrapper);
+        if (record == null) {
+            throw new BusinessException("记录不存在");
+        }
+        return record;
+    }
+
+    public void delete(Long id, Long userId) {
+        LambdaQueryWrapper<ExpressionRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ExpressionRecord::getId, id)
+               .eq(ExpressionRecord::getUserId, userId);
+        if (recordMapper.delete(wrapper) == 0) {
+            throw new BusinessException("记录不存在");
+        }
     }
 }

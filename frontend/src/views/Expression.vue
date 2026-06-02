@@ -47,10 +47,33 @@
         <div class="card">
           <div class="card-head"><h3>历史记录</h3><span class="badge">{{ records.length }}</span></div>
           <div v-if="records.length === 0" class="empty-mini"><p>还没有表达记录</p></div>
-          <div v-for="r in records.slice(0, 8)" :key="r.id" class="rec-item">
+          <div v-for="r in records.slice(0, 8)" :key="r.id" class="rec-item" @click="viewDetail(r)">
             <div class="rec-head"><span class="rec-topic">{{ r.topic }}</span><span v-if="r.aiLogicScore" class="rec-score">逻辑 {{ r.aiLogicScore }}</span></div>
             <p class="rec-text">{{ r.content?.slice(0, 100) }}{{ r.content?.length > 100 ? '...' : '' }}</p>
-            <span class="rec-date">{{ r.createdAt?.slice(0,16)?.replace('T',' ') }}</span>
+            <div class="rec-foot">
+              <span class="rec-date">{{ r.createdAt?.slice(0,16)?.replace('T',' ') }}</span>
+              <button class="rec-del" @click.stop="deleteRecord(r)">删除</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 详情弹窗遮罩 -->
+        <div v-if="detailVisible" class="modal-mask" @click.self="detailVisible = false">
+          <div class="modal-card" v-if="detail">
+            <div class="modal-header">
+              <h3>{{ detail.topic }}</h3>
+              <button class="modal-close" @click="detailVisible = false">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="detail-block"><h4>我的表达</h4><p>{{ detail.content }}</p></div>
+              <div class="scores-row">
+                <div class="score-ring"><div class="ring blue">{{ detail.aiLogicScore ?? '-' }}</div><span>逻辑评分</span></div>
+                <div class="score-ring"><div class="ring green">{{ detail.aiClarityScore ?? '-' }}</div><span>清晰度评分</span></div>
+              </div>
+              <div v-if="detailProblems.length" class="fb"><h4>🔧 表达问题</h4><ul><li v-for="(p,i) in detailProblems" :key="i">{{ p }}</li></ul></div>
+              <div v-if="detail.aiOptimizedExpression" class="fb"><h4 class="sug">✨ 优化示例</h4><p>{{ detail.aiOptimizedExpression }}</p></div>
+              <div v-if="detailSuggestions.length" class="fb"><h4>💡 训练建议</h4><ul><li v-for="(s,i) in detailSuggestions" :key="i">{{ s }}</li></ul></div>
+            </div>
           </div>
         </div>
       </div>
@@ -83,11 +106,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getTodayTopic, submitExpression, getExpressionHistory } from '../api/index.js'
-import { ElMessage } from 'element-plus'
+import { getTodayTopic, submitExpression, getExpressionHistory, getExpressionDetail, deleteExpression } from '../api/index.js'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const today = new Date().toLocaleDateString('zh-CN', { month:'long', day:'numeric', weekday:'short' })
 const topic = ref(''); const content = ref(''); const loading = ref(false); const result = ref(null); const records = ref([])
+const detailVisible = ref(false); const detail = ref(null); const detailProblems = ref([]); const detailSuggestions = ref([])
 
 const problems = computed(() => {
   if (!result.value?.aiProblems) return []
@@ -108,6 +132,26 @@ async function submit() {
 }
 async function loadData() { try { const t = await getTodayTopic(); topic.value = t.data?.topic || '' } catch { /* */ } loadRecords() }
 async function loadRecords() { try { const r = await getExpressionHistory(); records.value = r.data || [] } catch { /* */ } }
+async function viewDetail(rec) {
+  detailVisible.value = true; detail.value = null
+  try {
+    const r = await getExpressionDetail(rec.id)
+    const d = r.data
+    detail.value = d
+    try { detailProblems.value = typeof d.aiProblems === 'string' ? JSON.parse(d.aiProblems) : (d.aiProblems || []) } catch { detailProblems.value = [] }
+    try { detailSuggestions.value = typeof d.aiSuggestions === 'string' ? JSON.parse(d.aiSuggestions) : (d.aiSuggestions || []) } catch { detailSuggestions.value = [] }
+  } catch { /* */ }
+}
+async function deleteRecord(rec) {
+  try {
+    await ElMessageBox.confirm(`确定删除「${rec.topic}」这条记录吗？`, '删除确认', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deleteExpression(rec.id)
+    ElMessage.success('已删除')
+    records.value = records.value.filter(r => r.id !== rec.id)
+  } catch { /* 用户取消或删除失败 */ }
+}
 onMounted(loadData)
 </script>
 
@@ -151,11 +195,28 @@ onMounted(loadData)
 .fb ul { margin: 0; padding-left: 14px; } .fb li, .fb p { font-size: 13px; line-height: 1.5; color: #3C4A6E; margin: 0; }
 
 .empty-mini { text-align: center; padding: 20px 0; } .empty-mini p { font-size: 13px; color: #A0ACC5; margin: 0; }
-.rec-item { padding: 10px 0; border-bottom: 1px solid #F0F4FA; }
+.rec-item { padding: 10px 0; border-bottom: 1px solid #F0F4FA; cursor: pointer; border-radius: 8px; padding: 10px 8px; margin: 0 -8px; transition: background 0.12s; }
+.rec-item:hover { background: rgba(79,140,255,0.04); }
 .rec-item:last-child { border: none; }
 .rec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
 .rec-topic { font-size: 13px; font-weight: 600; color: #1C2640; } .rec-score { font-size: 11.5px; font-weight: 600; color: #4F8CFF; }
-.rec-text { font-size: 12.5px; color: #5B6780; margin: 3px 0; line-height: 1.4; } .rec-date { font-size: 11px; color: #A0ACC5; }
+.rec-text { font-size: 12.5px; color: #5B6780; margin: 3px 0; line-height: 1.4; }
+.rec-foot { display: flex; justify-content: space-between; align-items: center; }
+.rec-date { font-size: 11px; color: #A0ACC5; }
+.rec-del { font-size: 11px; color: #E55555; background: none; border: 1px solid #F5D0D0; border-radius: 6px; padding: 2px 10px; cursor: pointer; font-family: inherit; transition: all 0.12s; }
+.rec-del:hover { background: #FFF0F0; border-color: #E55555; }
+
+/* 详情弹窗 */
+.modal-mask { position: fixed; inset: 0; background: rgba(28,38,64,0.35); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.modal-card { background: #fff; border-radius: 18px; max-width: 640px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 16px 48px rgba(28,38,64,0.18); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 0; }
+.modal-header h3 { font-size: 16px; font-weight: 650; color: #1C2640; margin: 0; line-height: 1.4; }
+.modal-close { background: none; border: none; font-size: 22px; color: #909BB5; cursor: pointer; padding: 0 4px; line-height: 1; transition: color 0.12s; }
+.modal-close:hover { color: #1C2640; }
+.modal-body { padding: 16px 22px 22px; }
+.detail-block { background: #F8FAFD; border: 1px solid #E4EAF4; border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+.detail-block h4 { font-size: 11.5px; font-weight: 650; color: #909BB5; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.detail-block p { font-size: 13.5px; color: #3C4A6E; margin: 0; line-height: 1.6; white-space: pre-wrap; }
 
 .col-side { position: sticky; top: 24px; }
 .side-card { background: rgba(255,255,255,0.50); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-radius: 16px; padding: 16px; border: 1px solid rgba(79,140,255,0.12); box-shadow: 0 1px 6px rgba(79,140,255,0.03); margin-bottom: 12px; }

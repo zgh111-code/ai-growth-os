@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS expression_record (
     id                      BIGSERIAL    PRIMARY KEY,
     user_id                 BIGINT       NOT NULL,
     topic                   VARCHAR(200) NOT NULL,
-    content                 TEXT         NOT NULL,
+    content                 TEXT,
     ai_logic_score          INTEGER,
     ai_clarity_score        INTEGER,
     ai_problems             TEXT,

@@ -450,6 +450,22 @@ export function getExpressionHistory() {
 }
 
 /**
+ * 表达训练 — 查看单条详情
+ * @param {number} id 记录ID
+ */
+export function getExpressionDetail(id) {
+  return request({ url: `/expression/${id}`, method: 'get' })
+}
+
+/**
+ * 表达训练 — 删除单条记录
+ * @param {number} id 记录ID
+ */
+export function deleteExpression(id) {
+  return request({ url: `/expression/${id}`, method: 'delete' })
+}
+
+/**
  * 项目推进 — 提交项目状态
  * @param {object} data { projectName, status, blocker, progress }
  */
