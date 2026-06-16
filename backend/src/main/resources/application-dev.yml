@@ -21,6 +21,12 @@ server:
 # Spring 配置
 spring:
 
+  # 文件上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   # 数据源配置（连接本地 PostgreSQL 数据库）
   datasource:
     url: jdbc:postgresql://localhost:15432/ai_chat

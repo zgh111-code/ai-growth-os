@@ -244,7 +244,7 @@ const handleKbUpload = async (e) => {
   try {
     const form = new FormData()
     form.append('file', file)
-    const res = await request({ url: '/knowledge/upload', method: 'post', data: form, headers: { 'Content-Type': 'multipart/form-data' } })
+    const res = await request({ url: '/knowledge/upload', method: 'post', data: form, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })
     ElMessage.success(res.msg)
     loadKbFiles()
   } catch { ElMessage.error('上传失败') }

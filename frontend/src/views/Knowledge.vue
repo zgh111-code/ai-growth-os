@@ -99,7 +99,7 @@ const handleUpload = async (e) => {
   const file = e.target.files?.[0]; if (!file) return
   if (file.size > 5*1024*1024) { ElMessage.error('文件不能超过 5MB'); return }
   uploading.value = true
-  try { const f = new FormData(); f.append('file', file); const r = await request({ url: '/knowledge/upload', method: 'post', data: f, headers: { 'Content-Type': 'multipart/form-data' } }); ElMessage.success(r.msg); loadFiles() } catch { ElMessage.error('上传失败') }
+  try { const f = new FormData(); f.append('file', file); const r = await request({ url: '/knowledge/upload', method: 'post', data: f, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 }); ElMessage.success(r.msg); loadFiles() } catch { ElMessage.error('上传失败') }
   finally { uploading.value = false; e.target.value = '' }
 }
 const handleDelete = async (filename) => {
